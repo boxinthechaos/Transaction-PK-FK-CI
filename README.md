@@ -25,3 +25,7 @@ Spring에서는 @Transactional 어노테이션을 통해서 쉽고 깔끔하게 
 ## Proxy
 스프링은 기본적으로 트랜잭션을 Proxy를 통해서 처리한다
 ![image](https://github.com/user-attachments/assets/a851b4f8-29c7-43ae-a414-5d9372300aab)
+실제로 PostService의 addPost 메서드를 요청하면, 동작 전의 코드로는 위와 같이 보이지만 실제 런타임에서는 아래와 같이 작동한다
+![image](https://github.com/user-attachments/assets/a5142da4-9a10-4605-b70b-ea6620587d81)
+스프링이 어플리케이션이 동작할 때, Transaction 전후 처리를 하는 Proxy를 동적으로 생성해준다
+
