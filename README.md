@@ -72,3 +72,132 @@ N:M 관계는 서로가 서로를 1:N 관계, 1:M 관계로 갖고 있기 때문
 일반적으로 N:M 관계는 두 테이블의 대표키를 컬럼으로 갖는 또 다른 테이블(중간 테이블)을 생성해서 관리한다.
 
 
+# PK키와 FK키를 스프링 부트에 연결하기
+
+## 연관 관 정의 규칙
+연관 관계를 매핑할 때 중요한 것은 크게 3가지 있다
+- 방향 : 양방향, 단방향
+- 연관 관계의 주인 : 양방향일때 연관 관계에서 관리를 주체한다
+- 다중성 : 다대일(N:1), 일대다(1:N), 일대일(1:1), 다대다(N:N)
+
+# 1.JPA로 테이블 만들기
+ Java에서의 엔티티 설계
+ ![image](https://github.com/user-attachments/assets/376f68ad-0418-4429-8aac-9bc323a0e1e8)
+ 
+ ---
+ ✔️ Member.java
+ ```
+@Entity
+@Getter @Setter
+public class Member {   
+
+	@Id @GeneratedValue
+	@Column(name = "MEMBER_ID")
+	private Long id;
+    
+	private String name;
+	private String city;
+	private String street;
+	private String zipcode;	
+    
+}
+```
+- @Id - 현재 엔티의 기본 키임을 나타낸다
+- @Entity - JPA에서 관리한다
+- @GeneratedValue - KEY값을 DBSM에 시퀀스처럼 자동증가 퀄럼으로 만들어 준다
+- @Column(name = "MEMBER_ID") - 컬럼명을 새로 만들어 준다.
+---
+
+✔️ Order.java
+```
+@Entity							
+@Table(name = "ORDERS")	
+@Getter @Setter
+public class Order {
+	
+	@Id @GeneratedValue
+	@Column(name = "ORDER_ID")
+	private Long id;
+	
+	@Column(name = "MEMBER_ID")		// Member.java에 MEMBER_ID와 FK관계
+	private Long memberId;
+	
+	private LocalDateTime orderDate;
+	private String status;
+	
+}
+```
+---
+
+✔️ OrderItem.java
+```
+@Entity
+@Getter @Setter
+public class OrderItem {	
+	
+	@Id @GeneratedValue
+	@Column(name = "ORDER_ITEM_ID")
+	private Long id;
+	
+	@Column(name = "ORDER_ID")		// Order.java에 ORDER_ID와 FK관계
+	private Long orderId;	
+	
+	@Column(name = "ITEM_ID")		// Item.java에 ITEM_ID와 FK관계
+	private Long itemId;
+	
+	private int orderPrice;
+	private int count;
+	
+}
+```
+---
+
+✔️ Item.java
+```@Entity
+@Getter @Setter
+public class Item {
+	
+	@Id @GeneratedValue
+	@Column(name = "ITEM_ID")
+	private Long id;
+    
+	private String name;
+	private int price;
+	private int stockQuantity;
+}
+```
+---
+
+✔️ JpaMain.java <- JPA 실행을 위한 main클래스
+```
+public class JpaMain {
+
+	public static void main(String[] args) {
+
+		EntityManagerFactory emf = Persistence.createEntityManagerFactory("hello");
+		EntityManager em = emf.createEntityManager();
+		EntityTransaction tx = em.getTransaction();
+		tx.begin();
+		
+		try {
+        	tx.commit();
+		} catch (Exception e) {
+			tx.rollback();
+		}finally {
+			em.close();
+			emf.close();
+		}
+	}
+```
+---
+
+✔️ 클래스에서 화면 우클릭 > Run As > Java Application으로 실행하기
+![image](https://github.com/user-attachments/assets/19e97ce6-d078-4027-8e8f-b187b96146fe)
+
+---
+✔️ DB - Table 생성
+![image](https://github.com/user-attachments/assets/7f0f40d4-75fa-42bc-8e4e-a929318799d7)
+
+---
+
+
