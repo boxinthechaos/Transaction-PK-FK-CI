@@ -200,4 +200,357 @@ public class JpaMain {
 
 ---
 
+# 2. 양방향 매핑 하기
 
+## 2-1
+⭐️ex) Member / Team
+- 회원은 하나의 팀에만 소속된다
+- 회원과 팀은 다대일 관계이다
+> ![image](https://github.com/user-attachments/assets/d83f45eb-7bd2-4083-b1bb-66ecda97e524)
+---
+
+✔️ Member.java
+```
+@Entity
+@Getter @Setter
+public class Member {
+
+	@Id @GeneratedValue
+	@Column(name = "MEMBER_ID")
+	private Long id;
+	
+	@Column(name = "USERNAME")
+	private String name;
+    
+// 	FK 키 설정 전
+//	@Column(name = "TEAM_ID")
+//	private Long teamid;	
+	
+
+//  FK 키 설정
+	@ManyToOne
+	@JoinColumn(name = "TEAM_ID")  //  <- Team.java에 TEAM_ID와 연결된다
+	private Team team;
+}
+```
+---
+
+✔️ Team.java
+```
+@Entity
+@Getter @Setter
+public class Team {
+
+	@Id @GeneratedValue
+	@Column(name = "TEAM_ID")	
+	private Long id;
+	private String name;
+
+}
+```
+---
+
+✔️ JpaMain.java
+```
+public class JpaMain {
+
+	public static void main(String[] args) {
+
+		EntityManagerFactory emf = Persistence.createEntityManagerFactory("hello");
+		EntityManager em = emf.createEntityManager();
+		EntityTransaction tx = em.getTransaction();
+		tx.begin();
+        
+		try {
+			Team team = new Team();
+			team.setName("TeamA");
+			
+			// -> persist하면 영속상태가 된다.
+			// 영속상태가 될 때, PK의 값이 세팅이 된 후에 영속상태가 된다.
+			// Team을 먼저 생성해서 PK를 생성해야 FK를 생성할 수 있다.
+			em.persist(team); 
+			
+			Member member = new Member();
+			member.setName("member1");
+			// FK인 Member 에서 PK 객체인 Team을 통째로 가져온다. 
+			member.setTeam(team);
+	        em.persist(member);
+	        
+	        
+	        //강제 db 쿼리를 보고 싶을 때
+	        em.flush();
+	        em.clear();
+	        
+	        //select
+	        // find시에 1차캐시에서 가지고 와서 select문이 없다.
+	        Member findmember = em.find(Member.class, member.getId());
+	        // Member에서 Team 객체를 통째로 가져온다.
+	        Team findTeam = findmember.getTeam();
+	        
+	                
+			tx.commit(); 	// 영속성 컨텍스트에 들어가 테이블 생성
+			} catch (Exception e) {
+				tx.rollback();
+			}finally {
+				em.close();
+				emf.close();
+			}
+		}
+```
+---
+
+✔️ DB - Table 생성
+![image](https://github.com/user-attachments/assets/c6adce5d-9252-45d1-b039-db92f420a859)
+
+---
+> - 테이블 연관관계
+>   관계 1개
+>   Member 테이블 입장에서 Team 테이블 조인 가능
+>   Team 테이블 입장에서 Member 테이블 조인 가능
+
+> - 객체 연관관계
+>   관계 2개
+>   Member 객체에서 Team 객체로 연관관계 1개(단방향)
+>   Team 객체에서 Member 객체로 연관관계 1개(단방향)
+>   사실은 단방향 연관관계가 2개 있는 것이다
+
+> - 관리의 딜레마
+>   둘 중 하나로 외래키를 관리해야 한다.
+>   Member에서 Team으로 가는 team 참조 값과, Team에서 Member로 가는 members 참조 값이 있다.
+>   Member에서 Team값이 수정 되었을 때 Member table의 TEAM_ID가 수정되야 하는지, Team에 있는 members를 수정했을 때 Member table의 TEAM_ID가 수정되야 하는지?
+>   DB입장에서는 Member table에 있는 TEAM_ID만 update되면 된다. -> 룰(주인)이 생긴다.
+
+> - 연관관계의 주인(Owner) - 양방향 매핑 규칙
+>   객체의 두 관계중 하나를 연관관계의 주인으로 지정
+>   연관관계의 주인만이 외래 키를 관리(등록, 수정)
+>   주인이 아닌쪽은 읽기만 가능
+>   주인은 mappedBy 속성을 사용X
+>   -> `mappedBy` : 내가 누군가에 의해서 mapping되었다 라는 뜻
+>   주인이 아니면 mappedBy 속성으로 주인 지정
+>   ![image](https://github.com/user-attachments/assets/c7a36cee-1145-4989-894b-cc11c1a0d9cc)
+>
+>   ![image](https://github.com/user-attachments/assets/a128f09b-f95b-444b-8013-8fa7452a97ee)
+
+![image](https://github.com/user-attachments/assets/f94426f9-3da4-4881-a9b7-3b993c2ad1c9)
+
+- 현재 객체는 Member가 Team을 가졌으나, Team은 Member를 가지지 못한다
+- 객체 참조와 외래키의 가장 큰 차이점
+- 테이블은 FK만 있으면 양쪽에 연관관계를 알 수 있다.
+- Member -> Team : N -> 1 = @ManyToOne
+- Team -> Member : 1 -> N = @OneToMany
+
+---
+✔️ Team.java
+```
+@Entity
+@Getter @Setter
+public class Team {
+
+	@Id @GeneratedValue
+	@Column(name = "TEAM_ID")
+	private Long id;
+	private String name;
+	
+	/* team에 의해서 관리가 된다.
+	mappedBy가 적힌 곳은 읽기만 가능하다.
+	값을 넣어봐야 아무일도 벌어지지 않는다.
+	대신 조회는 가능
+	*/
+	@OneToMany(mappedBy = "team")	//**
+	private List<Member> member = new ArrayList<Member>();
+	
+	public void addMember(Member member) {
+		member.setTeam(this);
+		this.member.add(member);
+	}
+
+}
+```
+![image](https://github.com/user-attachments/assets/8088d788-fe46-41f3-a5d6-9ba6be099329)
+
+---
+✔️ JpaMain.java
+```
+public class JpaMain {
+
+	public static void main(String[] args) {
+
+		EntityManagerFactory emf = Persistence.createEntityManagerFactory("hello");
+		EntityManager em = emf.createEntityManager();
+		EntityTransaction tx = em.getTransaction();
+		tx.begin();
+		
+		try {
+  			Team team = new Team();
+			team.setName("TeamA");
+			
+			// -> persist하면 영속상태가 된다.
+			// 영속상태가 될 때, PK의 값이 세팅이 된 후에 영속상태가 된다.
+			// Team을 먼저 생성해서 PK를 생성해야 FK를 생성할 수 있다.
+			em.persist(team); 
+			
+			Member member = new Member();
+			member.setName("member1");
+			// FK인 Member 에서 PK 객체인 Team을 통째로 가져온다. 
+			//member.setTeam(team);
+	        em.persist(member);
+	        	        
+	        //강제 db 쿼리를 보고 싶을 때
+	       
+	        em.flush();	 // DB에 넣어준다.
+	        em.clear();  // 영속성 컨텍스트에 가지고 있던 crud구문을 비워준다.
+            
+			//============================================================
+			// 양방향 매핑
+	        Member findSideMember = em.find(Member.class, member.getId());
+	        List<Member> members = findmember.getTeam().getMember();
+	        
+	        for(Member m : members) {
+	        	System.out.println("result1 = " + m.getName());
+	        }
+	        //============================================================
+	        
+			tx.commit(); // commit하면 영속성 컨텍스트에 들어가기때문에 여기서 테이블 생성
+		} catch (Exception e) {
+			tx.rollback();
+		}finally {
+			em.close();
+			emf.close();
+		}
+	}
+}
+```
+> - 양방향 연관관계 주의
+>   순수 객체 상태를 고려해서 항상 양쪽에 값을 설정하자
+>   연관관계 편의 메소드를 생성하자
+>   양방향 매핑시에 무한 루프 조심하자
+> -> toString(), lombok lib 조심할 것
+
+> - 양방향 매핑 정리
+>   단방향 매핑만으로도 이미 연관관계 매핑은 완료
+>   양방향 매핑은 반대 방향으로 조회기능이 추가 된 것 뿐
+>   양방향 사용 이유 : JPQL에서 역방향으로 탐색할 일이 많음
+>   단방향 매핑을 잘 하고 양방향은 필요할 때 추가해도 됨(테이블에 영향을 주지 않음)
+>   결론 : 객체입장에서 양방향 매핑은 필수는 아님, 필요 시에 그때 생성해도 늦지 않는다
+
+> - 연관관계의 주인을 정하는 기준
+>   비지니스 로직을 기준으로 연관관계의 주인을 선택하면 안됨
+>   연관관계의 주인은 외래 키의 위치를 기준으로 정해야함
+
+# 📌 Item, Member, Order, OrderItem 클래스 양방향 매핑하기
+![image](https://github.com/user-attachments/assets/fa39f51e-9ff6-4780-b1d0-b4c678daf4bc)
+
+✔️ Item.java
+```
+@Entity
+@Getter @Setter
+public class Item {
+	
+	@Id @GeneratedValue
+	@Column(name = "ITEM_ID")
+	private Long id;
+	
+	@OneToMany(mappedBy = "item")
+	private List<OrderItem> orderItem = new ArrayList<OrderItem>();
+	
+	public void addOrderItem(OrderItem orderItem) {
+		orderItem.setItem(this);
+		this.orderItem.add(orderItem);
+	}
+	
+	private String name;
+	private int price;
+	private int stockQuantity;
+}
+```
+---
+
+✔️ Member.java
+```
+@Entity
+@Getter @Setter
+public class Member {
+
+	@Id @GeneratedValue
+	@Column(name = "MEMBER_ID")
+	private Long id;
+	
+	private String name;
+	private String city;
+	private String street;
+	private String zipcode;
+	
+	
+	@OneToMany(mappedBy = "member")
+	private List<Order> order = new ArrayList<Order>();
+	
+	public void addMember(Order order) {
+		order.setMember(this);
+		this.order.add(order);
+	}
+}
+```
+---
+
+✔️ Order.java
+```
+@Entity
+@Table(name = "ORDERS")
+@Getter @Setter
+public class Order {
+
+	@Id @GeneratedValue
+	@Column(name = "ORDER_ID")
+	private Long id;
+	
+	@OneToMany(mappedBy = "order")
+	private List<OrderItem> orderItem = new ArrayList<OrderItem>();
+	
+	public void addOrderItem(OrderItem orderItem) {
+		orderItem.setOrder(this);
+		this.orderItem.add(orderItem);
+	}
+	
+//	@Column(name = "MEMBER_ID")
+//	private Long memberId;
+	
+	@ManyToOne
+	@JoinColumn(name = "MEMBER_ID")
+	private Member member;
+	
+	
+	private LocalDateTime orderDate;
+	private String status;
+}
+```
+---
+✔️ OrderItem.java
+```
+@Entity
+@Setter @Getter
+public class OrderItem {
+
+	@Id @GeneratedValue
+	@Column(name = "ORDER_ITEM_ID")
+	private Long id;
+	
+	
+	@ManyToOne
+	@JoinColumn(name = "ORDER_ID")
+	private Order order;
+	
+	
+//	@Column(name = "ORDER_ID")
+//	private Long orderId;
+	
+//	@Column(name = "ITEM_ID")
+//	private Long itemId;
+	
+	@ManyToOne
+	@JoinColumn(name ="ITEM_ID")
+	private Item item;
+	
+	private int orderprice;
+	private int count;
+}
+```
